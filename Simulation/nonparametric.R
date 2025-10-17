@@ -13,6 +13,7 @@ library(lubridate)
 library(Matrix)
 
 load("count.Rdata")
+
 ####### Stan code for fitting Zinck model #######
 zinck_code <- "data {
   int<lower=1> K; // num topics
@@ -80,7 +81,9 @@ Z_sim <- generate_data_int(p=200, seed=1)$Z
 true_main <- generate_data_int(p=200, seed = 1)$S_beta
 true_int <- generate_data_int(p=200, seed=1)$S_gamma
 
-## Zinck(CLR) ##
+### ======== Apply differnt methods to do feature selection(set target_fdr=0.2, offset=1(knockoff+)) ======== ###
+
+## Method1: Zinck ##
 dlt <- c()
 for(t in (1:ncol(X_sim))){
    dlt[t] <- 1-mean(X_sim[,t]>0)
@@ -90,8 +93,8 @@ zinck_stan_data <- list(
   K = 15,
   V = ncol(X_sim),
   D = nrow(X_sim),
-  n = X_sim,
-  alpha = rep(1.0, 15),
+  n = X_sim, 
+  alpha = rep(0.2, 15),  # change from 1.0 to 0.2 for more zero-inflated knockoff (0.1 will genearte error)
   gamma1 = rep(0.5, ncol(X_sim)),
   gamma2 = rep(10.0, ncol(X_sim)),
   delta = dlt
@@ -101,9 +104,9 @@ fit1 <- vb(stan.model,
            data = zinck_stan_data,
            algorithm = "meanfield",
            importance_resampling = TRUE,
-           iter = 5000,
-           tol_rel_obj = 0.001,
-           elbo_samples = 100
+           iter = 10000,
+           tol_rel_obj = 0.01, 
+           elbo_samples = 500
 )
 
 theta <- fit1@sim[["est"]][["theta"]]
@@ -111,44 +114,50 @@ beta <- fit1@sim[["est"]][["beta"]]
 
 Xsim_tilde <- generateKnockoff(X_sim, theta, beta, seed=1) ## getting the knockoff copy
 
-index_est_zinck_h <- suppressWarnings(zinck.filter.interaction(X = X_sim,
-                                                               X_tilde = Xsim_tilde,
-                                                               Y = Y_sim,
-                                                               Z = Z_sim,
-                                                               model="Random Forest",
-                                                               fdr=0.2,offset=1,mtry=400,seed=15,ntrees =5000,
-                                                               metric="Accuracy", rftuning = TRUE, normalization = "CLR",
-                                                               heredity = "strong"
-                                                               ))
-index_est_zinck_sep <- suppressWarnings(zinck.filter.interaction(X = X_sim,
+index_est_zinck_her <- suppressWarnings(zinck.filter.interaction(X = X_sim,
                                                                  X_tilde = Xsim_tilde,
                                                                  Y = Y_sim,
                                                                  Z = Z_sim,
-                                                                 model="Random Forest",
-                                                                 fdr=0.2,offset=1,mtry=400,seed=15,ntrees =5000,
-                                                                 metric="Accuracy", rftuning = TRUE, normalization = "CLR",
+                                                                 model = "glmnet",
+                                                                 fdr = 0.2,
+															     offset = 1,
+															     seed = 1,
+                                                                 heredity = "strong"
+                                                                 ))
+index_est_zinck_sep <- suppressWarnings(zinck.filter.interaction(X = X_sim,
+                                                                 X_tilde = Xsim_tilde,
+                                                                 Y = Y_sim,
+                                                                 Z = Z_sim, 
+																 model = "glmnet"
+                                                                 fdr = 0.2,
+																 offset = 1,
+																 seed = 1,
                                                                  heredity = "separate"
                                                                  ))
 
-## MX-KF ##
+## Method2: MX-KF ##
 Xlog <- log_normalize(X_sim)
 Xlog_tilde <- create.second_order(Xlog)
 index_est_mxkf_sep <- zinck.filter.interaction(X = Xlog, 
                                                X_tilde = Xlog_tilde, 
                                                Y = Y_sim, 
                                                Z = Z_sim,
-                                               model="Random Forest", 
-                                               fdr=0.2, seed=1,
+                                               model="glmnet", 
+                                               fdr=0.2, 
+											   offset = 1,
+											   seed = 1,
                                                heredity = "separate")
-index_est_mxkf_h <- zinck.filter.interaction(X = Xlog, 
-                                             X_tilde = Xlog_tilde, 
-                                             Y = Y_sim, 
-                                             Z = Z_sim,
-                                             model = "Random Forest", 
-                                             fdr=0.2, seed=1,
-                                             heredity = "strong")
+index_est_mxkf_her <- zinck.filter.interaction(X = Xlog, 
+                                               X_tilde = Xlog_tilde, 
+                                               Y = Y_sim, 
+                                               Z = Z_sim,
+                                               model = "glmnet", 
+                                               fdr=0.2, 
+											   offset = 1,
+											   seed=1,
+                                               heredity = "strong")
 
-## LDA-KF ##
+## Method3: LDA-KF ##
 df.LDA <- as(as.matrix(X1),"dgCMatrix")
 vanilla.LDA <- LDA(df.LDA,k=8,method="VEM") 
 theta.LDA <- vanilla.LDA@gamma
@@ -159,16 +168,22 @@ index_est_lda_h <- zinck.filter.interaction(X = X_sim,
                                             X_tilde = Xsim_tilde.LDA,
                                             Y = Y_sim,
                                             Z = Z_sim,
-                                            model="Random Forest",
-                                            fdr=0.2,offset=0,seed=2, heredity = "strong")
+                                            model="glmnet",
+                                            fdr=0.2,
+											offset=1,
+											seed=1, 
+											heredity = "strong")
 index_est_lda_sep <- zinck.filter.interaction(X = X_sim,
                                               X_tilde = X1_tilde.LDA,
                                               Y = Y_sim,
                                               Z = Z_sim,
-                                              model="Random Forest",
-                                              fdr=0.2,offset=0,seed=2, heredity = "separate")
+                                              model="glmnet",
+                                              fdr=0.2,
+											  offset=1,
+											  seed=1, 
+											  heredity = "separate")
 
-## DeepLINK (Python Code) ##
+## Method4: DeepLINK (Python Code) ##
 import DeepLINK as dl
 from PCp1_numFactors import PCp1 as PCp1
 import numpy as np
@@ -222,7 +237,7 @@ def generate_data_int(p, seed):
 
     # ----- Main effects (beta) -----
     beta = np.zeros(p)
-    U_main = np.random.uniform(50, 100, size=40)
+    U_main = np.random.uniform(6, 12, size=40)
     sign_beta = np.random.choice([1, -1], size=40)
     beta_vals = sign_beta * (U_main / np.sqrt(Cj[biomarker_main_idx]))
     beta[biomarker_main_idx] = beta_vals
@@ -235,7 +250,7 @@ def generate_data_int(p, seed):
 
     # ----- Simulate continuous outcome Y ~ N(mu, 1) -----
     alpha = 1.0
-    fPi = 0.5 * (Pi ** 2) + Pi              # shape (n, p)
+    fPi = Pi                                # shape (n, p) # remove quadratic terms
     mu_main = fPi @ beta                    # shape (n,)
     mu_int = (fPi @ gamma) * Z              # shape (n,)
     mu = alpha * Z + mu_main + mu_int
