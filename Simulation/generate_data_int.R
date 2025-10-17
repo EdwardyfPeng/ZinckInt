@@ -1,4 +1,5 @@
 ###### Data Generating Process ######
+## Chaning the way of generating Y (remove high-order terms)
 generate_data_int <- function(p, seed){
   # Ordering the columns with decreasing abundance
   dcount <- count[, order(decreasing = TRUE, colSums(count, na.rm = TRUE), 
@@ -34,7 +35,7 @@ generate_data_int <- function(p, seed){
   
   # Main effects
   beta <- rep(0,p)
-  U_main <- runif(40, min = 50, max = 100)
+  U_main <- runif(40, min = 6, max = 12)
   sign_beta <- sample(c(1,-1), size = 40, replace = TRUE)
   beta_vals <- sign_beta * (U_main / sqrt(Cj[biomarker_main_idx]))
   beta[biomarker_main_idx] <- beta_vals
@@ -47,22 +48,17 @@ generate_data_int <- function(p, seed){
   
   ## simulated the continuous outcome Yi from a normal distribution with unit variance.
   alpha <- 1
-  fPi <- 0.5 * (Pi ^ 2) + Pi                 # n x p
+  fPi <- Pi  # CHANGED: Remove squared term, now linear
   mu_main <- as.vector(fPi %*% beta)             # n
   mu_int <- as.vector(fPi %*% gamma) * Z        # n
   mu <- alpha * Z + mu_main + mu_int
   Y <- rnorm(n, mean = mu, sd = 1)
   
   ## Generate final count data using multinomial sampling
-  
-  # Sample sequencing depths from template data
-  template_seq_depths <- rowSums(count)
-  drawn_depths <- sample(template_seq_depths, size = n, replace = TRUE)
-  
-  # Generate simulated count data
   sim_count <- matrix(0, nrow = n, ncol = p)
+  nSeq <- seq_depths
   for (i in 1:n) {
-    sim_count[i, ] <- rmultinom(1, size = drawn_depths[i], prob = Pi[i, ])
+    sim_count[i, ] <- rmultinom(1, size = nSeq[i], prob = Pi[i, ])
   }
   colnames(sim_count) <- colnames(Pi) 
   
@@ -75,4 +71,4 @@ generate_data_int <- function(p, seed){
     beta = beta,
     gamma = gamma
   ))
-}                     
+}
