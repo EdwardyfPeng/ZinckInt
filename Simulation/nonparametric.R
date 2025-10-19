@@ -257,14 +257,11 @@ def generate_data_int(p, seed):
     Y = np.random.normal(loc=mu, scale=1.0, size=n)
 
     # ----- Generate final count data via multinomial sampling -----
-    template_seq_depths = np.sum(count, axis=1)
-    drawn_depths = np.random.choice(template_seq_depths, size=n, replace=True)
 
     sim_count = np.zeros((n, p), dtype=int)
     for i in range(n):
         probs = Pi[i]
-        probs = probs / probs.sum()         # guard against tiny drift
-        sim_count[i] = np.random.multinomial(drawn_depths[i], probs)
+        sim_count[i] = np.random.multinomial(seq_depths[i], probs)
     
     return {
         "X": sim_count,
