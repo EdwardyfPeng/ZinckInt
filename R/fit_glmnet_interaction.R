@@ -9,16 +9,15 @@ fit_glmnet_interaction <- function(X, X_tilde, X_Z, X_tilde_Z, Y, Z,
   if (!is.null(seed)){
     set.seed(seed)
   }
-  
+
+  # main effect terms and interaction terms should share the same swapping vector. 
   swap_main <- rbinom(p, 1, 0.5)
   swap_main.M <- matrix(swap_main, nrow=n, ncol=p, byrow=TRUE)
   X_swap <- X * (1 - swap_main.M) + X_tilde * swap_main.M
   X_tilde_swap <- X * swap_main.M + X_tilde * (1 - swap_main.M)
   
-  swap_int <- rbinom(p, 1, 0.5)
-  swap_int.M <- matrix(swap_int, nrow=n, ncol=p, byrow=TRUE)
-  X_Z_swap <- X_Z * (1 - swap_int.M) + X_tilde_Z * swap_int.M
-  X_tilde_Z_swap <- X_Z * swap_int.M + X_tilde_Z * (1 - swap_int.M)
+  X_Z_swap <- X_Z * (1 - swap_main.M) + X_tilde_Z * swap_main.M
+  X_tilde_Z_swap <- X_Z * swap_main.M + X_tilde_Z * (1 - swap_main.M)
   
   X_aug <- cbind(Z, X_swap, X_Z_swap, X_tilde_swap, X_tilde_Z_swap)
   X_aug_std <- X_aug
@@ -47,7 +46,7 @@ fit_glmnet_interaction <- function(X, X_tilde, X_Z, X_tilde_Z, Y, Z,
   
   # Compute W statistics with swap correction
   W_main <- (abs(Z_main) - abs(Z_main_tilde)) * (1 - 2*swap_main)
-  W_int <- (abs(Z_int) - abs(Z_int_tilde)) * (1 - 2*swap_int)
+  W_int <- (abs(Z_int) - abs(Z_int_tilde)) * (1 - 2*swap_main)
   
   names(W_main) <- colnames(X)
   names(W_int) <- colnames(X)
