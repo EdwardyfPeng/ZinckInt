@@ -19,15 +19,6 @@ zinck.filter.interaction <- function(X, X_tilde, Y, Z, model = "Random Forest",
   X_Z <- X * Z  # Element-wise multiplication with Z (exposure)
   X_tilde_Z <- X_tilde * Z  # Knockoff interaction terms
   
-  # Construct augmented design matrix: {Z, X, X^(Z), X_tilde, X_tilde^(Z)}
-  X_aug <- cbind(Z, X, X_Z, X_tilde, X_tilde_Z)
-  
-  colnames(X_aug) <- c("Z",
-                       colnames(X),
-                       paste0(colnames(X), "_Z"),
-                       paste0(colnames(X_tilde), "_tilde"),
-                       paste0(colnames(X_tilde), "_Z_tilde"))
-  
   # ========== MODEL FITTING ==========
   if (model == "glmnet") {
     # Use glmnet for lasso regression
