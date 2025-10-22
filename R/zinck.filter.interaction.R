@@ -33,12 +33,11 @@ zinck.filter.interaction <- function(X, X_tilde, Y, Z, model = "Random Forest",
                                     mtry = mtry, metric = metric, seed = seed)
       W_main <- W_stats$W_main
       W_int <- W_stats$W_int
-    } else { # Use built-in knockoff statistics functions
+    } else { # Use revised built-in knockoff statistics functions
       if (!is.null(seed)){set.seed(seed)}
-      W_main <- stat.random_forest(X, X_tilde, Y)
-      W_int <- stat.random_forest(X_Z, X_tilde_Z, Y)
-      names(W_main) <- colnames(X)
-      names(W_int) <- colnames(X)
+      W_stats <- stat_rf_interaction(X, X_tilde, X_Z, X_tilde_Z, Y, Z, seed = seed)
+      W_main <- W_stats$W_main
+      W_int <- W_stats$W_int
     }
   }
     
