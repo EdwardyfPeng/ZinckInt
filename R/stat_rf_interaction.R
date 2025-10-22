@@ -1,4 +1,5 @@
 # stat_rf_interaction.R
+# r package ranger is required!
 ## revise the built-in rf function in knockoff package (we need to conduct rf on the whole augmented design).
 stat_rf_interaction <- function(X, X_tilde, X_Z, X_tilde_Z, Y, Z, seed = NULL) {
   p <- ncol(X)
